@@ -1,17 +1,12 @@
-import ifcopenshell.api
-import os
+# generate_ifc.py
+import ifcopenshell
 
-def create_basic_ifc(output_path="outputs/model.ifc"):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    model = ifcopenshell.api.run("model.create_empty")
-    ifcopenshell.api.run("unit.assign_unit", model, units=["METERS"])
+def create_basic_ifc():
+    # Crear un nuevo archivo IFC vacío
+    modelo = ifcopenshell.file()
 
-    # Crea un muro dummy (más adelante usaremos coordenadas reales)
-    wall = ifcopenshell.api.run("root.create_entity", model, {"type": "IfcWall"})
-    ifcopenshell.api.run("aggregate.assign_object", model, {
-        "products": [wall],
-        "aggregates": [model.by_type("IfcProject")[0]]
-    })
+    # Guardar el archivo IFC en disco (o donde prefieras)
+    ifc_path = "/tmp/modelo.ifc"  # en Railway puede ser /tmp para escritura
+    modelo.write(ifc_path)
 
-    model.write(output_path)
-    return output_path
+    return ifc_path
