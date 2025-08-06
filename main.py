@@ -55,7 +55,8 @@ async def upload_dxf(file: UploadFile = File(...)):
         os.rmdir(tmp_dir)
 
 
-# ---- Endpoint para crear IFC ----@app.get("/create-ifc")
+# ---- Endpoint para crear IFC ----
+@app.get("/create-ifc")
 def create_basic_ifc():
     try:
         # Crear modelo vacío IFC4
