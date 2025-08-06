@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 ezdxf
-ifcopenshell @ https://github.com/IfcOpenShell/IfcOpenShell/releases/download/nightly-v0.7.0/ifcopenshell-python-0.7.0-b4e4311-cp312-cp312-manylinux_2_28_x86_64.whl
+ifcopenshell
 python-multipart
