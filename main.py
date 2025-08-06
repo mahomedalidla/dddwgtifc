@@ -55,38 +55,40 @@ async def upload_dxf(file: UploadFile = File(...)):
         os.rmdir(tmp_dir)
 
 
-# ---- Endpoint para crear IFC ----
-@app.get("/create-ifc")
+# ---- Endpoint para crear IFC ----@app.get("/create-ifc")
 def create_basic_ifc():
     try:
-        # Crear modelo vacío
+        # Crear modelo vacío IFC4
         model = ifcopenshell.file(schema="IFC4")
 
-        # Añadir entidades mínimas requeridas
+        # Crear entidades mínimas requeridas
         project = model.create_entity("IfcProject", GlobalId=ifcopenshell.guid.new(), Name="ProyectoDemo")
-        context = model.create_entity("IfcGeometricRepresentationContext", ContextIdentifier="Body", ContextType="Model", CoordinateSpaceDimension=3, Precision=0.0001, WorldCoordinateSystem=model.create_entity("IfcAxis2Placement3D"))
-        unit_assignment = ifcopenshell.util.unit.assign_unit(model, length_units="METERS")
 
-        model.create_entity("IfcUnitAssignment", Units=unit_assignment)
+        # Crear contexto geométrico
+        context = model.create_entity(
+            "IfcGeometricRepresentationContext",
+            ContextIdentifier="Body",
+            ContextType="Model",
+            CoordinateSpaceDimension=3,
+            Precision=0.0001,
+            WorldCoordinateSystem=model.create_entity("IfcAxis2Placement3D")
+        )
 
-        model.create_entity("IfcProjectLibrary", GlobalId=ifcopenshell.guid.new(), Name="LibreríaDemo")
-        model.create_entity("IfcRelDefinesByProperties", GlobalId=ifcopenshell.guid.new(), Name="RelacionDemo")
-
+        # Relacionar el proyecto con el contexto
         project.RepresentationContexts = [context]
-        project.UnitsInContext = unit_assignment
 
-        # Guardar en archivo temporal
+        # Guardar IFC en archivo temporal
         ifc_path = "/tmp/basic_model.ifc"
         model.write(ifc_path)
 
-        # Leer archivo IFC para mostrar respuesta
+        # Leer el archivo IFC para devolver información
         with open(ifc_path, "rb") as f:
             data = f.read()
 
         os.remove(ifc_path)
 
         return {
-            "message": "Archivo IFC creado exitosamente (modo clásico)",
+            "message": "Archivo IFC creado exitosamente (modo básico sin unidades)",
             "ifc_file_size_bytes": len(data)
         }
 
