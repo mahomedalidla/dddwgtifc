@@ -3,3 +3,4 @@ uvicorn
 ezdxf
 ifcopenshell
 python-multipart
+supabase
