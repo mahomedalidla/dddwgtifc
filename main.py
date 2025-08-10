@@ -1,27 +1,20 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
 import os
 import ifcopenshell
+import ifcopenshell.util.unit
 import tempfile
 import ezdxf
-from supabase import create_client, Client
 
-# Inicializa FastAPI
 app = FastAPI()
-
-# Configurar Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-BUCKET_NAME = "ifc-files"  # Asegúrate que este bucket exista en Supabase
 
 # ---- Endpoint para leer DXF ----
 @app.post("/upload-dxf")
 async def upload_dxf(file: UploadFile = File(...)):
+    # Validar que sea DXF
     if not file.filename.endswith(".dxf"):
         raise HTTPException(status_code=400, detail="Solo se permiten archivos .dxf")
     
+    # Guardar archivo temporal
     tmp_dir = tempfile.mkdtemp()
     tmp_path = os.path.join(tmp_dir, file.filename)
 
@@ -62,13 +55,17 @@ async def upload_dxf(file: UploadFile = File(...)):
         os.rmdir(tmp_dir)
 
 
-# ---- Endpoint para crear IFC y subirlo a Supabase ----
+# ---- Endpoint para crear IFC ----
 @app.get("/create-ifc")
 def create_basic_ifc():
     try:
-        # Crear modelo IFC básico
+        # Crear modelo vacío IFC4
         model = ifcopenshell.file(schema="IFC4")
+
+        # Crear entidades mínimas requeridas
         project = model.create_entity("IfcProject", GlobalId=ifcopenshell.guid.new(), Name="ProyectoDemo")
+
+        # Crear contexto geométrico
         context = model.create_entity(
             "IfcGeometricRepresentationContext",
             ContextIdentifier="Body",
@@ -77,29 +74,24 @@ def create_basic_ifc():
             Precision=0.0001,
             WorldCoordinateSystem=model.create_entity("IfcAxis2Placement3D")
         )
+
+        # Relacionar el proyecto con el contexto
         project.RepresentationContexts = [context]
 
         # Guardar IFC en archivo temporal
         ifc_path = "/tmp/basic_model.ifc"
         model.write(ifc_path)
 
-        # Leer archivo IFC
+        # Leer el archivo IFC para devolver información
         with open(ifc_path, "rb") as f:
-            ifc_data = f.read()
-
-        # Subir a Supabase
-        file_name = f"basic_model.ifc"
-        response = supabase.storage.from_(BUCKET_NAME).upload(file_name, ifc_data, {"content-type": "application/octet-stream", "upsert": True})
-
-        # Generar URL pública
-        public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(file_name)
+            data = f.read()
 
         os.remove(ifc_path)
 
         return {
-            "message": "Archivo IFC creado y subido exitosamente",
-            "public_url": public_url
+            "message": "Archivo IFC creado exitosamente (modo básico sin unidades)",
+            "ifc_file_size_bytes": len(data)
         }
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
