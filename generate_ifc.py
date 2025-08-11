@@ -92,11 +92,15 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
             Representations=[shape_representation]
         )
 
+        # Crear la ubicación del muro en el espacio del proyecto
+        placement = model.create_entity("IfcLocalPlacement")
+
         # Crear muro con geometría
         wall = model.create_entity(
             "IfcWallStandardCase",
             GlobalId=ifcopenshell.guid.new(),
             Name=f"Wall_{idx}",
+            ObjectPlacement=placement,
             Representation=product_def_shape
         )
         model.add(wall)
