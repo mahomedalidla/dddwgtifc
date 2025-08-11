@@ -1,97 +1,75 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-import os
-import ifcopenshell
-import ifcopenshell.util.unit
-import tempfile
-import ezdxf
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
+import os, tempfile, shutil
+
+from parse_dxf import extract_entities
+from generate_ifc import create_ifc_from_entities
+from supabase import create_client
+from dotenv import load_dotenv
+
+# Cargar variables de entorno (en Railway deben estar configuradas)
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "ifc-files")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 
-# ---- Endpoint para leer DXF ----
-@app.post("/upload-dxf")
-async def upload_dxf(file: UploadFile = File(...)):
-    # Validar que sea DXF
-    if not file.filename.endswith(".dxf"):
-        raise HTTPException(status_code=400, detail="Solo se permiten archivos .dxf")
-    
-    # Guardar archivo temporal
+@app.post("/convert")
+async def convert_file(
+    file: UploadFile = File(...),
+    units: str = Form("mm"),
+    wall_height: float = Form(3000.0),
+    layers: str = Form("WALLS,DOORS,WINDOWS")
+):
+    """
+    Convierte un archivo DXF a IFC, lo guarda en Supabase y devuelve un enlace firmado.
+    """
+    if not file.filename.lower().endswith(".dxf"):
+        raise HTTPException(status_code=400, detail="Por ahora solo se aceptan archivos .dxf")
+
     tmp_dir = tempfile.mkdtemp()
     tmp_path = os.path.join(tmp_dir, file.filename)
 
-    with open(tmp_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-
     try:
-        doc = ezdxf.readfile(tmp_path)
-        msp = doc.modelspace()
+        # Guardar archivo temporal
+        with open(tmp_path, "wb") as f:
+            f.write(await file.read())
 
-        lines = []
-        polylines = []
+        # Extraer entidades del DXF
+        target_layers = [l.strip() for l in layers.split(",")]
+        entities = extract_entities(tmp_path, target_layers)
 
-        for e in msp:
-            if e.dxftype() == 'LINE':
-                lines.append({
-                    "start": (e.dxf.start.x, e.dxf.start.y, e.dxf.start.z),
-                    "end": (e.dxf.end.x, e.dxf.end.y, e.dxf.end.z)
-                })
-            elif e.dxftype() == 'LWPOLYLINE':
-                points = [(p[0], p[1], 0) for p in e]
-                polylines.append(points)
+        if not entities:
+            raise HTTPException(status_code=400, detail="No se encontraron entidades en las capas especificadas")
 
-        return {
-            "message": "Archivo DXF leído correctamente",
-            "line_count": len(lines),
-            "polyline_count": len(polylines),
-            "lines": lines,
-            "polylines": polylines
-        }
+        # Generar IFC
+        out_ifc = os.path.join(tmp_dir, "modelo.ifc")
+        create_ifc_from_entities(entities, out_ifc, wall_height, units)
 
+        # Subir IFC a Supabase
+        supabase_path = f"{os.path.splitext(file.filename)[0]}.ifc"
+        with open(out_ifc, "rb") as f:
+            supabase.storage.from_(SUPABASE_BUCKET).upload(supabase_path, f, {"upsert": True})
+
+        # Crear URL firmada (1 hora)
+        signed_url = supabase.storage.from_(SUPABASE_BUCKET).create_signed_url(supabase_path, 3600)
+
+        return JSONResponse(content={
+            "message": "Conversión exitosa",
+            "ifc_url": signed_url["signedURL"]
+        })
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error leyendo DXF: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {str(e)}")
     finally:
-        os.remove(tmp_path)
-        os.rmdir(tmp_dir)
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
-
-# ---- Endpoint para crear IFC ----
-@app.get("/create-ifc")
-def create_basic_ifc():
-    try:
-        # Crear modelo vacío IFC4
-        model = ifcopenshell.file(schema="IFC4")
-
-        # Crear entidades mínimas requeridas
-        project = model.create_entity("IfcProject", GlobalId=ifcopenshell.guid.new(), Name="ProyectoDemo")
-
-        # Crear contexto geométrico
-        context = model.create_entity(
-            "IfcGeometricRepresentationContext",
-            ContextIdentifier="Body",
-            ContextType="Model",
-            CoordinateSpaceDimension=3,
-            Precision=0.0001,
-            WorldCoordinateSystem=model.create_entity("IfcAxis2Placement3D")
-        )
-
-        # Relacionar el proyecto con el contexto
-        project.RepresentationContexts = [context]
-
-        # Guardar IFC en archivo temporal
-        ifc_path = "/tmp/basic_model.ifc"
-        model.write(ifc_path)
-
-        # Leer el archivo IFC para devolver información
-        with open(ifc_path, "rb") as f:
-            data = f.read()
-
-        os.remove(ifc_path)
-
-        return {
-            "message": "Archivo IFC creado exitosamente (modo básico sin unidades)",
-            "ifc_file_size_bytes": len(data)
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
+@app.get("/")
+def root():
+    return {"message": "API DXF → IFC lista con Supabase", "status": "ok"}
