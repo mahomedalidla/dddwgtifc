@@ -26,7 +26,6 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
 
     # Asignar unidades al proyecto (mm o metros)
     if units == "mm":
-        length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="MILLISECOND")
         length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="MILLIMETRE")
     elif units == "m" or units == "meter" or units == "meters":
         length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="METRE")
