@@ -53,8 +53,13 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
         points = [model.create_entity("IfcCartesianPoint", (float(x), float(y), 0.0)) for x, y in entity]
         polyline = model.create_entity("IfcPolyline", Points=points)
 
+        # Para IfcPolyLoop, la lista de puntos debe estar explícitamente cerrada.
+        loop_points = list(points)
+        if loop_points[0].Coordinates != loop_points[-1].Coordinates:
+            loop_points.append(loop_points[0])
+
         # Crear IfcPolyLoop para definir la base del perfil
-        poly_loop = model.create_entity("IfcPolyLoop", Polygon=points)
+        poly_loop = model.create_entity("IfcPolyLoop", Polygon=loop_points)
 
         # Crear IfcArbitraryClosedProfileDef con la polilínea
         profile = model.create_entity(
