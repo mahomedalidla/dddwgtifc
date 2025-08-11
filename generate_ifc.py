@@ -45,6 +45,9 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
 
     # Crear elementos IfcWallStandardCase con geometría extruida
     for idx, entity in enumerate(entities):
+        # Omitir geometrías que no son polígonos cerrados (necesitan al menos 3 vértices)
+        if len(entity) < 3:
+            continue
         # Se espera que entity sea una lista de puntos [(x1,y1), (x2,y2), ...] que definen una polilínea cerrada
         # Crear IfcPolyline a partir de puntos 2D (z=0)
         points = [model.create_entity("IfcCartesianPoint", (float(x), float(y), 0.0)) for x, y in entity]
