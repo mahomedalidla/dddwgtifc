@@ -41,8 +41,7 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
         length_unit.Prefix = "MILLI"
     # 'm' es el default de IfcSIUnit, no se necesita hacer nada
 
-    # Crear unidad de medida para el proyecto
-    ifcopenshell.api.run("project.assign_representation_context", model, product=project, context=context)
+    
 
     # Crear elementos IfcWallStandardCase con geometría extruida
     for idx, entity in enumerate(entities):
