@@ -4,3 +4,4 @@ ezdxf
 ifcopenshell
 python-multipart
 supabase
+python-dotenv
