@@ -24,16 +24,22 @@ def create_ifc_from_entities(entities, output_path, wall_height=3000.0, units="m
 
     project.RepresentationContexts = [context]
 
-    # Asignar unidades al proyecto (mm o metros)
-    if units == "mm":
-        length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="MILLIMETRE")
-    elif units == "m" or units == "meter" or units == "meters":
-        length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="METRE")
-    else:
-        # Por defecto milímetros
-        length_unit = ifcopenshell.api.run("unit.create_si_unit", model, unit_type="LENGTHUNIT", name="MILLIMETRE")
+    # Asignar unidades al proyecto
+    unit_assignment = model.create_entity("IfcUnitAssignment")
+    project.UnitsInContext = unit_assignment
 
-    ifcopenshell.api.run("unit.assign_unit", model, units=[length_unit])
+    # Crear y asignar las unidades basicas
+    length_unit = model.create_entity("IfcSIUnit", UnitType="LENGTHUNIT", Name="METRE")
+    area_unit = model.create_entity("IfcSIUnit", UnitType="AREAUNIT", Name="SQUARE_METRE")
+    volume_unit = model.create_entity("IfcSIUnit", UnitType="VOLUMEUNIT", Name="CUBIC_METRE")
+    plane_angle_unit = model.create_entity("IfcSIUnit", UnitType="PLANEANGLEUNIT", Name="RADIAN")
+    
+    unit_assignment.Units = [length_unit, area_unit, volume_unit, plane_angle_unit]
+
+    # Configurar la unidad de longitud segun el parametro 'units'
+    if units == "mm":
+        length_unit.Prefix = "MILLI"
+    # 'm' es el default de IfcSIUnit, no se necesita hacer nada
 
     # Crear unidad de medida para el proyecto
     ifcopenshell.api.run("project.assign_representation_context", model, product=project, context=context)
