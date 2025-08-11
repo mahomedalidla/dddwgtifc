@@ -53,7 +53,7 @@ async def convert_file(
         # Subir IFC a Supabase
         supabase_path = f"{os.path.splitext(file.filename)[0]}.ifc"
         with open(out_ifc, "rb") as f:
-            supabase.storage.from_(SUPABASE_BUCKET).upload(supabase_path, f, {"upsert": True})
+            supabase.storage.from_(SUPABASE_BUCKET).upload(supabase_path, f, {"upsert": "true"})
 
         # Crear URL firmada (1 hora)
         signed_url = supabase.storage.from_(SUPABASE_BUCKET).create_signed_url(supabase_path, 3600)
